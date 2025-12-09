@@ -34,6 +34,8 @@
                   tidyverse
                   drc
                   rstudio_prefs
+		  devtools
+                  roxygen2
                 ]; # add new R packages (from nix) here to get tied in
               })
             ];
@@ -41,7 +43,7 @@
           shellHook = ''
             	      R -e "require(rstudio.prefs); rstudio_config_path('./rstudio-prefs.json');"
                     echo "RStudio Analysis Shell - ${system}"
-            	      rstudio
+            	    echo "Available commands: rstudio"
           '';
         };
     });
