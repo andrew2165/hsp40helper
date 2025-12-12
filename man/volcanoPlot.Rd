@@ -2,20 +2,26 @@
 % Please edit documentation in R/ProteinDataAnalysis.R
 \name{volcanoPlot}
 \alias{volcanoPlot}
-\title{Generate Volcano Plots}
+\title{Generate Volcano Plot}
 \usage{
-volcanoPlot(object, idColumn, foldChange, ...)
+volcanoPlot(
+  object,
+  idColumn,
+  foldChange = "FoldChange",
+  pValueCol = "TTestPValue",
+  ...
+)
 }
 \arguments{
 \item{object}{A ProteinAnalysisData object.}
 
-\item{idColumn}{Column containing ProteinIDs}
+\item{idColumn}{Column containing ProteinIDs (character scalar)}
 
-\item{foldChange}{Column containing fold change values}
+\item{foldChange}{Column containing fold change values (character scalar)}
 }
 \value{
 A ggplot2 object
 }
 \description{
-Generate Volcano Plots
+Generate Volcano Plot
 }

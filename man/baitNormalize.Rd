@@ -4,16 +4,16 @@
 \alias{baitNormalize}
 \title{Normalize to Bait}
 \usage{
-baitNormalize(object, idColumn, cleanUpIDs, removeBait = TRUE, ...)
+baitNormalize(object, idColumn, baitID, removeBait = TRUE, ...)
 }
 \arguments{
 \item{object}{A ProteinAnalysisData object.}
 
 \item{idColumn}{The Protein ID column name (character) to normalize.}
 
-\item{removeBait}{Remove the Bait entry from the object (boolean).}
-
 \item{baitID}{The UniProt Protein ID of the Bait used (character).}
+
+\item{removeBait}{Remove the Bait entry from the object (boolean).}
 }
 \value{
 The updated ProteinAnalysisData object.

@@ -6,8 +6,8 @@
 \usage{
 runCorrectedTTest(
   object,
-  vehicleSamples,
-  treatmentSamples,
+  vehicleSamples = NULL,
+  treatmentSamples = NULL,
   method = "Benjamini-Hochberg",
   ...
 )
@@ -15,9 +15,11 @@ runCorrectedTTest(
 \arguments{
 \item{object}{A ProteinAnalysisData object.}
 
-\item{vehicleSamples}{The columns containing the normalized vehicle intensities (list).}
+\item{vehicleSamples}{The columns containing the normalized vehicle intensities (character vector; optional).}
 
-\item{treatmentSamples}{The columns containing the normalize treatment intensities (list).}
+\item{treatmentSamples}{The columns containing the normalized treatment intensities (character vector; optional).}
+
+\item{method}{Correction method for multiple comparison (default: "Benjamini-Hochberg").}
 }
 \value{
 The updated ProteinAnalysisData object.

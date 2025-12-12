@@ -209,66 +209,105 @@ setMethod(
 #' Run t-test
 #'
 #' @param object A ProteinAnalysisData object.
-#' @param vehicleSamples The columns containing the normalized vehicle intensities (list).
-#' @param treatmentSamples The columns containing the normalize treatment intensities (list).
+#' @param vehicleSamples The columns containing the normalized vehicle intensities (character vector; optional).
+#' @param treatmentSamples The columns containing the normalized treatment intensities (character vector; optional).
+#' @param method Correction method for multiple comparison (default: "Benjamini-Hochberg").
 #' @return The updated ProteinAnalysisData object.
 #' @import dplyr
 #' @export
 setGeneric(
   "runCorrectedTTest",
-  function(object, vehicleSamples, treatmentSamples, method = "Benjamini-Hochberg", ...) standardGeneric("runCorrectedTTest")
+  function(object, vehicleSamples = NULL, treatmentSamples = NULL, method = "Benjamini-Hochberg", ...) standardGeneric("runCorrectedTTest")
 )
 setMethod(
   f = "runCorrectedTTest",
   signature = "ProteinAnalysisData",
-  definition = function(object, vehicleSamples, treatmentSamples, method = "Benjamini-Hochberg", ...) {
+  definition = function(object, vehicleSamples = NULL, treatmentSamples = NULL, method = "Benjamini-Hochberg", ...) {
     df <- object@dataframe
-    if (baitID %in% idColumn) {
-      # df[[column]] <- (df[[column]] - min(df[[column]], na.rm = TRUE)) /
-      #                 (max(df[[column]], na.rm = TRUE) - min(df[[column]], na.rm = TRUE))
-      # object@dataframe <- df
-      # df = dplyr::filter(df, !(idColumn %in% cleanUpIDs))
-      # object@dataframe = df
 
-      # TODO: write this part of the function
-    } else {
-      warning("Bait ProteinID not found.")
+    # Use class slots if not provided as arguments
+    if (is.null(vehicleSamples) && !is.null(slot(object, "vehicleSamples"))) {
+      vehicleSamples <- slot(object, "vehicleSamples")
     }
+    if (is.null(treatmentSamples) && !is.null(slot(object, "treatmentSamples"))) {
+      treatmentSamples <- slot(object, "treatmentSamples")
+    }
+    if (is.null(vehicleSamples) || is.null(treatmentSamples)) {
+      stop("vehicleSamples and treatmentSamples must be provided (either directly or via setSamples()).")
+    }
+    if (!all(vehicleSamples %in% colnames(df))) {
+      stop("Some vehicleSamples columns not found in dataframe.")
+    }
+    if (!all(treatmentSamples %in% colnames(df))) {
+      stop("Some treatmentSamples columns not found in dataframe.")
+    }
+
+    # Run t-test for each row/protein
+    p.values <- apply(df, 1, function(row) {
+      vehicle <- as.numeric(row[vehicleSamples])
+      treatment <- as.numeric(row[treatmentSamples])
+      if (length(na.omit(vehicle)) < 2 || length(na.omit(treatment)) < 2) return(NA)
+      tryCatch({
+        t.test(vehicle, treatment)$p.value
+      }, error = function(e) NA)
+    })
+
+    # TODO: only apply this if that is specified in the function call
+    # Benjamini-Hochberg correction
+    ranks <- rank(p.values, ties.method = "min")
+    m <- length(p.values)
+    q.values <- p.values * m / ranks
+    q.values[q.values > 1] <- 1
+
+    df$TTestPValue <- p.values
+    df$TTestQValue <- q.values
+    object@dataframe <- df
     return(object)
   }
-) 
+)
 
 
 # TODO: write a method to generate volcano plots
-#' Generate Volcano Plots
+#' Generate Volcano Plot
 #'
 #' @param object A ProteinAnalysisData object.
-#' @param idColumn Column containing ProteinIDs
-#' @param foldChange Column containing fold change values
+#' @param idColumn Column containing ProteinIDs (character scalar)
+#' @param foldChange Column containing fold change values (character scalar)
 #' @return A ggplot2 object
 #' @import ggplot2
 #' @export
 setGeneric(
   "volcanoPlot",
-  function(object, idColumn, foldChange, ...) standardGeneric("volcanoPlot")
+  function(object, idColumn, foldChange = "FoldChange", pValueCol = "TTestPValue", ...) standardGeneric("volcanoPlot")
 )
 setMethod(
   f = "volcanoPlot",
   signature = "ProteinAnalysisData",
-  definition = function(object, idColumn, foldChange, ...) {
+  definition = function(object, idColumn, foldChange = "FoldChange", pValueCol = "TTestPValue", ...) {
     df <- object@dataframe
-    if (baitID %in% idColumn) {
-      # df[[column]] <- (df[[column]] - min(df[[column]], na.rm = TRUE)) /
-      #                 (max(df[[column]], na.rm = TRUE) - min(df[[column]], na.rm = TRUE))
-      # object@dataframe <- df
-      # df = dplyr::filter(df, !(idColumn %in% cleanUpIDs))
-      # object@dataframe = df
+    # Check necessary columns
+    if (!(idColumn %in% colnames(df))) stop(paste("Column", idColumn, "not in dataframe"))
+    if (!(foldChange %in% colnames(df))) stop(paste("Column", foldChange, "not in dataframe"))
+    if (!(pValueCol %in% colnames(df))) stop(paste("Column", pValueCol, "not in dataframe"))
 
-      # TODO: write this part of the function
-    } else {
-      warning("Bait ProteinID not found.")
-    }
-    return(object)
+    # Prepare data, handling zeros and NAs
+    plot_df <- df[!is.na(df[[foldChange]]) & !is.na(df[[pValueCol]]), ]
+    plot_df$log2FC <- log2(plot_df[[foldChange]])
+    # Avoid -Inf when p = 0; set very small value
+    plot_df[[pValueCol]][plot_df[[pValueCol]] <= 0] <- .Machine$double.xmin
+    plot_df$negLog10P <- -log10(plot_df[[pValueCol]])
+
+    library(ggplot2)
+    p <- ggplot(plot_df, aes(x = log2FC, y = negLog10P, label = plot_df[[idColumn]])) +
+      geom_point(alpha = 0.6) +
+      labs(
+        x = "log2(Fold Change)",
+        y = "-log10(p-value)",
+        title = "Volcano Plot"
+      ) +
+      theme_minimal()
+
+    return(p)
   }
 )
 

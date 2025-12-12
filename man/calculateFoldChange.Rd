@@ -4,16 +4,22 @@
 \alias{calculateFoldChange}
 \title{Calculate Fold Change}
 \usage{
-calculateFoldChange(object, idColumn, vehicleSamples, treatmentSamples, ...)
+calculateFoldChange(
+  object,
+  idColumn,
+  vehicleSamples = NULL,
+  treatmentSamples = NULL,
+  ...
+)
 }
 \arguments{
 \item{object}{A ProteinAnalysisData object.}
 
 \item{idColumn}{The Protein ID column name (character).}
 
-\item{vehicleSamples}{The columns containing the normalized vehicle intensities (list).}
+\item{vehicleSamples}{The columns containing the normalized vehicle intensities (character vector; optional).}
 
-\item{treatmentSamples}{The columns containing the normalize treatment intensities (list).}
+\item{treatmentSamples}{The columns containing the normalized treatment intensities (character vector; optional).}
 }
 \value{
 The updated ProteinAnalysisData object.
