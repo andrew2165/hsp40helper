@@ -29,21 +29,28 @@
               (rWrapper.override { packages = [ rPackages.rstudio_prefs ]; })
               curlFull
               rPackages.curl
+              rPackages.tidyverse
+              rPackages.devtools
+              rPackages.roxygen2
+              rPackages.lintr
+              rPackages.styler
               (rstudioWrapper.override {
                 packages = with rPackages; [
                   tidyverse
                   drc
                   rstudio_prefs
-		  devtools
+		              devtools
                   roxygen2
-                ]; # add new R packages (from nix) here to get tied in
+                  lintr
+                  styler
+                ]; # add new R packages (from nix) here to get tied into Rstudio
               })
             ];
 
           shellHook = ''
             	      R -e "require(rstudio.prefs); rstudio_config_path('./rstudio-prefs.json');"
                     echo "RStudio Analysis Shell - ${system}"
-            	    echo "Available commands: rstudio"
+            	      echo "Available commands: rstudio, R"
           '';
         };
     });

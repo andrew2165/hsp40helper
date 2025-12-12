@@ -10,7 +10,10 @@ setClass(
   "ProteinAnalysisData",
   slots = list(
     filepath = "character",
-    dataframe = "data.frame"
+    dataframe = "data.frame",
+    vehicleSamples = "character",
+    treatmentSamples = "character",
+    baitID = "character"
   )
 )
 
@@ -44,6 +47,30 @@ read.fragpipe <- function(filepath, ...) {
 }
 
 
+#' Set Samples
+#'
+#' @param object A ProteinAnalysisData object.
+#' @param vehicleSamples Character vector of column names for vehicle samples.
+#' @param treatmentSamples Character vector of column names for treatment samples.
+#' @return The updated ProteinAnalysisData object.
+#' @import dplyr
+#' @export
+setGeneric(
+  "setSamples",
+  function(object, vehicleSamples, treatmentSamples, ...) standardGeneric("setSamples")
+)
+setMethod(
+  f = "setSamples",
+  signature = "ProteinAnalysisData",
+  definition = function(object, vehicleSamples, treatmentSamples, ...) {
+    # Store the vectors as slots
+    object@vehicleSamples <- vehicleSamples
+    object@treatmentSamples <- treatmentSamples
+    return(object)
+  }
+)
+
+
 # TODO: set a standard set of protein IDs to be removed
 # e.g., Immunoglobulins, non-human proteins, etc.
 #' Remove unwanted ProteinIDs in ProteinAnalysisData
@@ -67,8 +94,8 @@ setMethod(
       # df[[column]] <- (df[[column]] - min(df[[column]], na.rm = TRUE)) /
       #                 (max(df[[column]], na.rm = TRUE) - min(df[[column]], na.rm = TRUE))
       # object@dataframe <- df
-      df = dplyr::filter(df, !(idColumn %in% cleanUpIDs))
-      object@dataframe = df
+      df <- dplyr::filter(df, !(idColumn %in% cleanUpIDs))
+      object@dataframe <- df
     } else {
       warning("Protein ID Column not found.")
     }
@@ -156,10 +183,10 @@ setMethod(
 #' @export
 setGeneric(
   "runCorrectedTTest",
-  function(object, vehicleSamples, treatmentSamples, method = "Benjamini-Hochberg", ...) standardGeneric("runtTest")
+  function(object, vehicleSamples, treatmentSamples, method = "Benjamini-Hochberg", ...) standardGeneric("runCorrectedTTest")
 )
 setMethod(
-  f = "runtTest",
+  f = "runCorrectedTTest",
   signature = "ProteinAnalysisData",
   definition = function(object, vehicleSamples, treatmentSamples, method = "Benjamini-Hochberg", ...) {
     df <- object@dataframe
@@ -190,7 +217,7 @@ setMethod(
 #' @export
 setGeneric(
   "volcanoPlot",
-  function(object, idColumn, foldChange, ...) standardGeneric("runtTest")
+  function(object, idColumn, foldChange, ...) standardGeneric("volcanoPlot")
 )
 setMethod(
   f = "volcanoPlot",
@@ -211,4 +238,3 @@ setMethod(
     return(object)
   }
 )
-
