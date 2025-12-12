@@ -2,8 +2,9 @@
 
 export(baitNormalize)
 export(calculateFoldChange)
-export(cleanData)
+export(commonContaminantProteinIDs)
 export(read.fragpipe)
+export(removeContaminants)
 export(runCorrectedTTest)
 export(setSamples)
 export(volcanoPlot)

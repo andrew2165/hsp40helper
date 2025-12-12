@@ -70,34 +70,41 @@ setMethod(
   }
 )
 
-
 # TODO: set a standard set of protein IDs to be removed
 # e.g., Immunoglobulins, non-human proteins, etc.
+#' Standard set of ProteinIDs to remove (e.g., contaminants or unwanted proteins)
+#'
+#' @export
+commonContaminantProteinIDs <- c(
+  "InsertCommonContaminantsHere"
+)
+
+
 #' Remove unwanted ProteinIDs in ProteinAnalysisData
 #'
+#' Removes rows where the value in idColumn matches any of the provided cleanUpIDs.
+#'
 #' @param object A ProteinAnalysisData object.
-#' @param idColumn The Protein ID column name (character) to normalize.
-#' @param cleanUpIDs The Protein IDs to be removed (list).
+#' @param idColumn Character. The column name containing Protein IDs.
+#' @param cleanUpIDs Character vector of Protein IDs to remove.
 #' @return The updated ProteinAnalysisData object.
 #' @import dplyr
 #' @export
 setGeneric(
-  "cleanData",
-  function(object, idColumn, cleanUpIDs, ...) standardGeneric("cleanData")
+  "removeContaminants",
+  function(object, idColumn, cleanUpIDs, ...) standardGeneric("removeContaminants")
 )
 setMethod(
-  f = "cleanData",
+  f = "removeContaminants",
   signature = "ProteinAnalysisData",
   definition = function(object, idColumn, cleanUpIDs, ...) {
     df <- object@dataframe
     if (idColumn %in% names(df)) {
-      # df[[column]] <- (df[[column]] - min(df[[column]], na.rm = TRUE)) /
-      #                 (max(df[[column]], na.rm = TRUE) - min(df[[column]], na.rm = TRUE))
-      # object@dataframe <- df
-      df <- dplyr::filter(df, !(idColumn %in% cleanUpIDs))
+      # Remove rows where the value in idColumn matches any cleanUpIDs
+      df <- dplyr::filter(df, !(!!rlang::sym(idColumn) %in% cleanUpIDs))
       object@dataframe <- df
     } else {
-      warning("Protein ID Column not found.")
+      warning("Protein ID column not found in dataframe.")
     }
     return(object)
   }
@@ -115,21 +122,31 @@ setMethod(
 #' @export
 setGeneric(
   "baitNormalize",
-  function(object, idColumn, cleanUpIDs, removeBait = TRUE, ...) standardGeneric("baitNormalize")
+  function(object, idColumn, baitID, removeBait = TRUE, ...) standardGeneric("baitNormalize")
 )
 setMethod(
   f = "baitNormalize",
   signature = "ProteinAnalysisData",
   definition = function(object, idColumn, baitID, removeBait = TRUE, ...) {
     df <- object@dataframe
-    if (baitID %in% idColumn) {
-      # df[[column]] <- (df[[column]] - min(df[[column]], na.rm = TRUE)) /
-      #                 (max(df[[column]], na.rm = TRUE) - min(df[[column]], na.rm = TRUE))
-      # object@dataframe <- df
-      # df = dplyr::filter(df, !(idColumn %in% cleanUpIDs))
-      # object@dataframe = df
-
-      # TODO: write this part of the function
+    # Find the bait row
+    bait_row <- df[[idColumn]] == baitID
+    if (any(bait_row)) {
+      # Identify sample columns (all columns except the idColumn)
+      sample_cols <- setdiff(colnames(df), idColumn)
+      # Get the bait intensities for all samples
+      bait_intensities <- df[bait_row, sample_cols, drop = FALSE]
+      if (nrow(bait_intensities) != 1) {
+        warning("More than one row matched for bait protein ID; using the first.")
+        bait_intensities <- bait_intensities[1, , drop = FALSE]
+      }
+      # Normalize each sample column by the bait intensity in that sample
+      df[ , sample_cols] <- sweep(df[ , sample_cols, drop = FALSE], 2, as.numeric(bait_intensities), `/`)
+      # Optionally remove the bait row
+      if (removeBait) {
+        df <- df[!bait_row, , drop = FALSE]
+      }
+      object@dataframe <- df
     } else {
       warning("Bait ProteinID not found.")
     }
@@ -142,31 +159,47 @@ setMethod(
 #'
 #' @param object A ProteinAnalysisData object.
 #' @param idColumn The Protein ID column name (character).
-#' @param vehicleSamples The columns containing the normalized vehicle intensities (list).
-#' @param treatmentSamples The columns containing the normalize treatment intensities (list).
+#' @param vehicleSamples The columns containing the normalized vehicle intensities (character vector; optional).
+#' @param treatmentSamples The columns containing the normalized treatment intensities (character vector; optional).
 #' @return The updated ProteinAnalysisData object.
 #' @import dplyr
 #' @export
 setGeneric(
   "calculateFoldChange",
-  function(object, idColumn, vehicleSamples, treatmentSamples, ...) standardGeneric("calculateFoldChange")
+  function(object, idColumn, vehicleSamples = NULL, treatmentSamples = NULL, ...) standardGeneric("calculateFoldChange")
 )
 setMethod(
   f = "calculateFoldChange",
   signature = "ProteinAnalysisData",
-  definition = function(object, idColumn, vehicleSamples, treatmentSamples, ...) {
+  definition = function(object, idColumn, vehicleSamples = NULL, treatmentSamples = NULL, ...) {
     df <- object@dataframe
-    if (baitID %in% idColumn) {
-      # df[[column]] <- (df[[column]] - min(df[[column]], na.rm = TRUE)) /
-      #                 (max(df[[column]], na.rm = TRUE) - min(df[[column]], na.rm = TRUE))
-      # object@dataframe <- df
-      # df = dplyr::filter(df, !(idColumn %in% cleanUpIDs))
-      # object@dataframe = df
-
-      # TODO: write this part of the function
-    } else {
-      warning("Bait ProteinID not found.")
+    # Use class slots if input not specified
+    if (is.null(vehicleSamples) && !is.null(slot(object, "vehicleSamples"))) {
+      vehicleSamples <- slot(object, "vehicleSamples")
     }
+    if (is.null(treatmentSamples) && !is.null(slot(object, "treatmentSamples"))) {
+      treatmentSamples <- slot(object, "treatmentSamples")
+    }
+    if (is.null(vehicleSamples) || is.null(treatmentSamples)) {
+      stop("vehicleSamples and treatmentSamples must be provided (either as arguments or set with setSamples()).")
+    }
+    # Input checks
+    if (!all(vehicleSamples %in% colnames(df))) {
+      stop("Some vehicleSamples columns not found in dataframe.")
+    }
+    if (!all(treatmentSamples %in% colnames(df))) {
+      stop("Some treatmentSamples columns not found in dataframe.")
+    }
+
+    # TODO: check for potential issue here where the vehicleSamples and treatmentSamples are either not
+    # the normalized intensities bc of how the baitNormalize function works or check if the raw intensities
+    # are being dropped from the dataframe entirely
+
+    # Calculate means and fold change
+    vehicle_means <- rowMeans(df[, vehicleSamples, drop=FALSE], na.rm=TRUE)
+    treatment_means <- rowMeans(df[, treatmentSamples, drop=FALSE], na.rm=TRUE)
+    df$FoldChange <- treatment_means / vehicle_means
+    object@dataframe <- df
     return(object)
   }
 )
@@ -203,7 +236,7 @@ setMethod(
     }
     return(object)
   }
-)
+) 
 
 
 # TODO: write a method to generate volcano plots
@@ -238,3 +271,6 @@ setMethod(
     return(object)
   }
 )
+
+
+# TODO: check all of the functions in this file for completeness and correctness
