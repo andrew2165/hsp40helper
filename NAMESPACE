@@ -3,6 +3,7 @@
 export(baitNormalize)
 export(calculateFoldChange)
 export(commonContaminantProteinIDs)
+export(getDataframe)
 export(read.fragpipe)
 export(removeContaminants)
 export(runCorrectedTTest)

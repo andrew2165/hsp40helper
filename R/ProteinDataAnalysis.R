@@ -70,6 +70,35 @@ setMethod(
   }
 )
 
+#' Get Sample Columns from Object or Arguments
+#'
+#' @param object A ProteinAnalysisData object.
+#' @param vehicleSamples Optional character vector of vehicle sample column names.
+#' @param treatmentSamples Optional character vector of treatment sample column names.
+#' @return A list with two elements: vehicleSamples, treatmentSamples.
+.getSampleColumns <- function(object, vehicleSamples = NULL, treatmentSamples = NULL) {
+  # Try to get from object if not provided
+  if (is.null(vehicleSamples) && !is.null(slot(object, "vehicleSamples"))) {
+    vehicleSamples <- slot(object, "vehicleSamples")
+  }
+  if (is.null(treatmentSamples) && !is.null(slot(object, "treatmentSamples"))) {
+    treatmentSamples <- slot(object, "treatmentSamples")
+  }
+  if (is.null(vehicleSamples) || is.null(treatmentSamples)) {
+    stop("vehicleSamples and treatmentSamples must be provided (either as arguments or set with setSamples()).")
+  }
+  # Check if columns actually exist in the dataframe
+  df <- object@dataframe
+  if (!all(vehicleSamples %in% colnames(df))) {
+    stop("Some vehicleSamples columns not found in dataframe.")
+  }
+  if (!all(treatmentSamples %in% colnames(df))) {
+    stop("Some treatmentSamples columns not found in dataframe.")
+  }
+  return(list(vehicleSamples = vehicleSamples, treatmentSamples = treatmentSamples))
+}
+
+
 # TODO: set a standard set of protein IDs to be removed
 # e.g., Immunoglobulins, non-human proteins, etc.
 #' Standard set of ProteinIDs to remove (e.g., contaminants or unwanted proteins)
@@ -127,21 +156,38 @@ setGeneric(
 setMethod(
   f = "baitNormalize",
   signature = "ProteinAnalysisData",
-  definition = function(object, idColumn, baitID, removeBait = TRUE, ...) {
+  definition = function(object, idColumn, baitID, removeBait = TRUE, 
+  vehicleSamples = NULL, treatmentSamples = NULL, ...) {
     df <- object@dataframe
-    # Find the bait row
-    bait_row <- df[[idColumn]] == baitID
+
+    # Extract out the bait row
+    bait_row <- df %>% filter(idColumn == baitID)
+
     if (any(bait_row)) {
-      # Identify sample columns (all columns except the idColumn)
-      sample_cols <- setdiff(colnames(df), idColumn)
-      # Get the bait intensities for all samples
-      bait_intensities <- df[bait_row, sample_cols, drop = FALSE]
-      if (nrow(bait_intensities) != 1) {
-        warning("More than one row matched for bait protein ID; using the first.")
-        bait_intensities <- bait_intensities[1, , drop = FALSE]
+      # Call helper function
+      samples = .getSampleColumns(object, vehicleSamples, treatmentSamples)
+      # Un pack columns
+      sampleColumns = c(samples$vehicleSamples, samples$treatmentSamples)
+      # Normalize by bait
+      # normalized = df[sampleColumns] / bait_row[sampleColumns]
+      divVectors = function(x, y){
+        return(x / y)
       }
-      # Normalize each sample column by the bait intensity in that sample
-      df[ , sample_cols] <- sweep(df[ , sample_cols, drop = FALSE], 2, as.numeric(bait_intensities), `/`)
+      normalizedColumns = do.call(
+        rbind,
+        apply(
+          df[sampleColumns], 
+          1, 
+          function(x) divVectors(x, bait_row[sampleColumns])
+        )
+      )
+
+      df = cbind(
+        df[, !names(df) %in% sampleColumns], 
+        normalizedColumns
+      )
+
+
       # Optionally remove the bait row
       if (removeBait) {
         df <- df[!bait_row, , drop = FALSE]
@@ -311,5 +357,22 @@ setMethod(
   }
 )
 
+
+#' Get dataframe
+#'
+#' @param object A ProteinAnalysisData object.
+#' @return Dataframe of object data
+#' @export
+setGeneric(
+  "getDataframe",
+  function(object, ...) standardGeneric("getDataframe")
+)
+setMethod(
+  f = "getDataframe",
+  signature = "ProteinAnalysisData",
+  definition = function(object, ...) {
+    return(object@dataframe)
+  }
+)
 
 # TODO: check all of the functions in this file for completeness and correctness
